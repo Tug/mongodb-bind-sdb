@@ -121,9 +121,13 @@ static isc_result_t db_connect(struct dbinfo *dbi)
  */
 static isc_result_t maybe_reconnect(struct dbinfo *dbi)
 {
-    mongo_reconnect( dbi->conn );
-
-    return (db_connect(dbi));
+    if(mongo_reconnect(dbi->conn) != mongo_conn_success)
+        return (ISC_R_FAILURE);
+    
+    if(mongo_cmd_authenticate(dbi->conn, dbi->database, dbi->user, dbi->passwd) != MONGO_OK)
+        return (ISC_R_FAILURE);
+    
+    return (ISC_R_SUCCESS);
 }
 
 
