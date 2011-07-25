@@ -91,7 +91,7 @@ static dns_sdbimplementation_t *mongodb = NULL;
 
 struct dbinfo
 {
-    mongo_connection conn[1];
+    mongo conn[1];
     char *database;
     char *collection;
     char *host;
@@ -107,7 +107,7 @@ static void mongodb_destroy(const char *zone, void *driverdata, void **dbdata);
  */
 static isc_result_t db_connect(struct dbinfo *dbi)
 {
-    if(mongo_connect(dbi->conn , dbi->host, atoi(dbi->port) ) != mongo_conn_success)
+    if(mongo_connect(dbi->conn , dbi->host, atoi(dbi->port) ) != MONGO_OK)
         return (ISC_R_FAILURE);
     
     if(mongo_cmd_authenticate(dbi->conn, dbi->database, dbi->user, dbi->passwd) != MONGO_OK)
@@ -121,7 +121,7 @@ static isc_result_t db_connect(struct dbinfo *dbi)
  */
 static isc_result_t maybe_reconnect(struct dbinfo *dbi)
 {
-    if(mongo_reconnect(dbi->conn) != mongo_conn_success)
+    if(mongo_reconnect(dbi->conn) != MONGO_OK)
         return (ISC_R_FAILURE);
     
     if(mongo_cmd_authenticate(dbi->conn, dbi->database, dbi->user, dbi->passwd) != MONGO_OK)
@@ -139,39 +139,37 @@ static isc_result_t mongodb_lookup(const char *zone, const char *name, void *dbd
 {
     isc_result_t result;
     struct dbinfo *dbi = dbdata;
-    bson_iterator it[1];
+    bson_iterator it;
     mongo_cursor *cursor;
-    bson query[1];
-    bson_buffer query_buf[1];
+    bson query;
     const char * key, * rdata, *rdtype;
     int ttl;
-    
     
     UNUSED(zone);
     
     char ns[1000];
     snprintf(ns, sizeof(ns), "%s.%s", dbi->database, dbi->collection);
     
-    bson_buffer_init( query_buf );
-    bson_append_string( query_buf, "name", name );
-    bson_from_buffer( query, query_buf );
+    bson_init(&query);
+    bson_append_string(&query, "name", name);
+    bson_finish(&query);
     
     result = maybe_reconnect(dbi);
     if (result != ISC_R_SUCCESS)
         return (result);
     
-    cursor = mongo_find( dbi->conn, ns, query, NULL, 0, 0, 0);
+    cursor = mongo_find(dbi->conn, ns, &query, NULL, 0, 0, 0);
     
     while( mongo_cursor_next(cursor) == MONGO_OK ) {
-        bson_iterator_init(it, cursor->current.data);
-        while( bson_iterator_next(it) ) {
-            key = bson_iterator_key(it);
+        bson_iterator_init(&it, cursor->current.data);
+        while( bson_iterator_next(&it) ) {
+            key = bson_iterator_key(&it);
             if(strcmp(key, "ttl") == 0) {
-                ttl = bson_iterator_int(it);
+                ttl = bson_iterator_int(&it);
             } else if(strcmp(key, "rdtype") == 0) {
-                rdtype = bson_iterator_string(it);
+                rdtype = bson_iterator_string(&it);
             } else if(strcmp(key, "rdata") == 0) {
-                rdata = bson_iterator_string(it);
+                rdata = bson_iterator_string(&it);
             }
         }
         result = dns_sdb_putrr(lookup, rdtype, ttl, rdata);
@@ -180,7 +178,8 @@ static isc_result_t mongodb_lookup(const char *zone, const char *name, void *dbd
  		}
     }
     
-    bson_destroy( query );
+    mongo_cursor_destroy(cursor);
+    bson_destroy(&query);
 
 	return (ISC_R_SUCCESS);
 }
@@ -193,10 +192,9 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
 {
     isc_result_t result;
     struct dbinfo *dbi = dbdata;
-    bson_iterator it[1];
+    bson_iterator it;
     mongo_cursor *cursor;
-    bson empty[1];
-    bson_empty( empty );
+    bson empty;
     const char * key, * name, * rdata, * rdtype;
     int ttl;
 
@@ -209,20 +207,20 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
     if (result != ISC_R_SUCCESS)
         return (result);
     
-    cursor = mongo_find( dbi->conn, ns, empty, empty, 0, 0, 0);
+    cursor = mongo_find( dbi->conn, ns, bson_empty( &empty ), bson_empty( &empty ), 0, 0, 0);
     
     while( mongo_cursor_next(cursor) == MONGO_OK ) {
-        bson_iterator_init(it, cursor->current.data);
-        while( bson_iterator_next(it) ) {
-            key = bson_iterator_key(it);
+        bson_iterator_init(&it, cursor->current.data);
+        while( bson_iterator_next(&it) ) {
+            key = bson_iterator_key(&it);
             if(strcmp(key, "name") == 0) {
-                name = bson_iterator_string(it);
+                name = bson_iterator_string(&it);
             } else if(strcmp(key, "ttl") == 0) {
-                ttl = bson_iterator_int(it);
+                ttl = bson_iterator_int(&it);
             } else if(strcmp(key, "rdtype") == 0) {
-                rdtype = bson_iterator_string(it);
+                rdtype = bson_iterator_string(&it);
             } else if(strcmp(key, "rdata") == 0) {
-                rdata = bson_iterator_string(it);
+                rdata = bson_iterator_string(&it);
             }
         }
         result = dns_sdb_putnamedrr(allnodes, name, rdtype, ttl, rdata);
@@ -230,6 +228,7 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
             return (ISC_R_FAILURE);
     	}
     }
+    mongo_cursor_destroy(cursor);
 
     return (ISC_R_SUCCESS);
 }
@@ -307,8 +306,9 @@ static void mongodb_destroy(const char *zone, void *driverdata, void **dbdata)
 
     UNUSED(zone);
     UNUSED(driverdata);
-
+    
     mongo_destroy(dbi->conn);
+    
     if (dbi->database != NULL)
         isc_mem_free(ns_g_mctx, dbi->database);
     if (dbi->collection != NULL)
