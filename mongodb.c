@@ -2,7 +2,7 @@
  * MongoDB BIND SDB Driver
  *
  * Copyright (C) 2011-2012 Tugdual de Kerviler <dekervit@gmail.com>.
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of
@@ -14,14 +14,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, 
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
  * MA 02111-1307 USA
  *
- * $Id: mongodb.c,v 0.1 2011/06/12 23:33:00 tugdual Exp $ 
+ * $Id: mongodb.c,v 0.1 2011/06/12 23:33:00 tugdual Exp $
  */
 
-#include <config.h>   
+#include <config.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -66,23 +66,23 @@
  *
  * Rebuilding the Server (modified from bind9/doc/misc/sdb)
  * =====================================================
- * 
- * The driver module and header file (mongodb.c and mongodb.h) 
+ *
+ * The driver module and header file (mongodb.c and mongodb.h)
  * must be copied to (or linked into)
  * the bind9/bin/named and bind9/bin/named/include directories
  * respectively, and must be added to the DBDRIVER_OBJS and DBDRIVER_SRCS
- * lines in bin/named/Makefile.in (e.g. add mongodb.c to DBDRIVER_SRCS and 
- * mongodb.@O@ to DBDRIVER_OBJS).  
- * 
+ * lines in bin/named/Makefile.in (e.g. add mongodb.c to DBDRIVER_SRCS and
+ * mongodb.@O@ to DBDRIVER_OBJS).
+ *
  * Add the results from the command `mysql_config --cflags` to DBDRIVER_INCLUDES.
  * (e.g. DBDRIVER_INCLUDES = -I'/root/mongo-c-driver/src')
  *
  * Add the results from the command `mysql_config --libs` to DBRIVER_LIBS.
  * (e.g. DBDRIVER_LIBS = -L'/root/mongo-c-driver' -lmongoc)
- * 
- * In bind9/bin/named/main.c, add an include to mongodb.h 
+ *
+ * In bind9/bin/named/main.c, add an include to mongodb.h
  * (e.g. #include "mongodb.h")  Then you must register the driver
- * in setup(), by adding mongodb_init(); before the call to ns_server_create().  
+ * in setup(), by adding mongodb_init(); before the call to ns_server_create().
  * Unregistration should be in cleanup(), by adding the call mongodb_clear();
  * after the call to ns_server_destroy().
  */
@@ -109,10 +109,10 @@ static isc_result_t db_connect(struct dbinfo *dbi)
 {
     if(mongo_connect(dbi->conn , dbi->host, atoi(dbi->port) ) != MONGO_OK)
         return (ISC_R_FAILURE);
-    
+
     if(mongo_cmd_authenticate(dbi->conn, dbi->database, dbi->user, dbi->passwd) != MONGO_OK)
         return (ISC_R_FAILURE);
-        
+
     return (ISC_R_SUCCESS);
 }
 
@@ -123,10 +123,10 @@ static isc_result_t maybe_reconnect(struct dbinfo *dbi)
 {
     if(mongo_reconnect(dbi->conn) != MONGO_OK)
         return (ISC_R_FAILURE);
-    
+
     if(mongo_cmd_authenticate(dbi->conn, dbi->database, dbi->user, dbi->passwd) != MONGO_OK)
         return (ISC_R_FAILURE);
-    
+
     return (ISC_R_SUCCESS);
 }
 
@@ -144,22 +144,22 @@ static isc_result_t mongodb_lookup(const char *zone, const char *name, void *dbd
     bson query;
     const char * key, * rdata, *rdtype;
     int ttl;
-    
+
     UNUSED(zone);
-    
+
     char ns[1000];
     snprintf(ns, sizeof(ns), "%s.%s", dbi->database, dbi->collection);
-    
+
     bson_init(&query);
     bson_append_string(&query, "name", name);
     bson_finish(&query);
-    
+
     result = maybe_reconnect(dbi);
     if (result != ISC_R_SUCCESS)
         return (result);
-    
+
     cursor = mongo_find(dbi->conn, ns, &query, NULL, 0, 0, 0);
-    
+
     while( mongo_cursor_next(cursor) == MONGO_OK ) {
         bson_iterator_init(&it, cursor->current.data);
         while( bson_iterator_next(&it) ) {
@@ -177,7 +177,7 @@ static isc_result_t mongodb_lookup(const char *zone, const char *name, void *dbd
              return (ISC_R_FAILURE);
  		}
     }
-    
+
     mongo_cursor_destroy(cursor);
     bson_destroy(&query);
 
@@ -202,13 +202,13 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
 
     char ns[1000];
     snprintf(ns, sizeof(ns), "%s.%s", dbi->database, dbi->collection);
-    
+
     result = maybe_reconnect(dbi);
     if (result != ISC_R_SUCCESS)
         return (result);
-    
+
     cursor = mongo_find( dbi->conn, ns, bson_empty( &empty ), bson_empty( &empty ), 0, 0, 0);
-    
+
     while( mongo_cursor_next(cursor) == MONGO_OK ) {
         bson_iterator_init(&it, cursor->current.data);
         while( bson_iterator_next(&it) ) {
@@ -255,11 +255,11 @@ static isc_result_t mongodb_create(const char *zone, int argc, char **argv,
 
     if (argc < 2)
         return (ISC_R_FAILURE);
-    
+
     dbi = isc_mem_get(ns_g_mctx, sizeof(struct dbinfo));
     if (dbi == NULL)
         return (ISC_R_NOMEMORY);
-    
+
     dbi->database   = NULL;
     dbi->collection = NULL;
     dbi->host       = NULL;
@@ -277,18 +277,18 @@ static isc_result_t mongodb_create(const char *zone, int argc, char **argv,
 	    goto cleanup;				\
 	}						\
     } while (0);
-    
+
     STRDUP_OR_FAIL(dbi->database,   argv[0]);
     STRDUP_OR_FAIL(dbi->collection, argv[1]);
     STRDUP_OR_FAIL(dbi->host,       argv[2]);
     STRDUP_OR_FAIL(dbi->port,       argv[3]);
     STRDUP_OR_FAIL(dbi->user,       argv[4]);
     STRDUP_OR_FAIL(dbi->passwd,     argv[5]);
-    
+
     result = db_connect(dbi);
     if (result != ISC_R_SUCCESS)
 	    goto cleanup;
-	
+
     *dbdata = dbi;
     return (ISC_R_SUCCESS);
 
@@ -306,9 +306,9 @@ static void mongodb_destroy(const char *zone, void *driverdata, void **dbdata)
 
     UNUSED(zone);
     UNUSED(driverdata);
-    
+
     mongo_destroy(dbi->conn);
-    
+
     if (dbi->database != NULL)
         isc_mem_free(ns_g_mctx, dbi->database);
     if (dbi->collection != NULL)
