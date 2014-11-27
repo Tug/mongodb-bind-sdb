@@ -194,7 +194,6 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
     struct dbinfo *dbi = dbdata;
     bson_iterator it;
     mongo_cursor *cursor;
-    bson empty;
     const char * key, * name, * rdata, * rdtype;
     int ttl;
 
@@ -207,7 +206,7 @@ static isc_result_t mongodb_allnodes(const char *zone, void *dbdata, dns_sdballn
     if (result != ISC_R_SUCCESS)
         return (result);
 
-    cursor = mongo_find( dbi->conn, ns, bson_empty( &empty ), bson_empty( &empty ), 0, 0, 0);
+    cursor = mongo_find( dbi->conn, ns, bson_shared_empty(), bson_shared_empty(), 0, 0, 0);
 
     while( mongo_cursor_next(cursor) == MONGO_OK ) {
         bson_iterator_init(&it, cursor->current.data);
