@@ -77,7 +77,7 @@
  * Add the results from the command `mysql_config --cflags` to DBDRIVER_INCLUDES.
  * (e.g. DBDRIVER_INCLUDES = -I'/root/mongo-c-driver/src')
  *
- * Add the results from the command `mysql_config --libs` to DBRIVER_LIBS.
+ * Add the path of mongo-c-driver to DBDRIVER_LIBS.
  * (e.g. DBDRIVER_LIBS = -L'/root/mongo-c-driver' -lmongoc)
  *
  * In bind9/bin/named/main.c, add an include to mongodb.h
